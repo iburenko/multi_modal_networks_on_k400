@@ -1,0 +1,23 @@
+modality: ???
+
+seed: 34
+
+model:
+  model_name: ???
+  residual_block: ???
+  T: 16
+
+optimization:
+  lr: 0.1
+  warmup: 0
+  epochs: 60
+  train_bs: ???
+  val_bs: ???
+  accumulate_batches: 2
+
+training:
+  num_nodes: ???
+  continue_training: ???
+  job_id: ???
+  train_num_workers: 14
+  val_num_workers: 7
