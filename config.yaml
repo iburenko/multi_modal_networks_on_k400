@@ -6,9 +6,11 @@ model:
   model_name: ???
   residual_block: ???
   T: 16
+  num_classes: 400
 
 optimization:
   lr: 0.1
+  wd: 4.0e-5
   warmup: 0
   epochs: 60
   train_bs: ???
