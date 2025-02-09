@@ -11,23 +11,23 @@ from transformers import (
     VideoMAEForVideoClassification, VideoMAEConfig, VideoMAEModel,
     VivitConfig, VivitForVideoClassification, VivitModel
 )
-
 from torchvision.models.video import r3d_18, r2plus1d_18, mc3_18
 
-def get_video_encoder(model_name, T, residual_block, modality=None):
+from resnet_si import make_resnet34k
+
+def get_video_encoder(model_name, T, residual_block, num_classes, modality):
     if model_name in ["video_mae", "vivit"]:
-        return get_transformer_encoder(model_name, T, modality)
+        return get_transformer_encoder(model_name, T, num_classes, modality)
     elif model_name.split("_")[0] in ["r2plus1", "mc3", "r3d"]:
-        return get_cnn_encoder(model_name, residual_block)
+        return get_cnn_encoder(model_name, residual_block, num_classes)
     
-def get_transformer_encoder(model_name, T, modality=None):
+def get_transformer_encoder(model_name, T, num_classes, modality):
     if model_name == "video_mae":
         if modality == "rgb_audio":
             num_classes = -1
             video_mae_config = VideoMAEConfig(num_labels=num_classes)
             video_mae = VideoMAEModel(video_mae_config)
         elif modality == "rgb":
-            num_classes = 400
             video_mae_config = VideoMAEConfig(num_labels=num_classes)
             video_mae = VideoMAEForVideoClassification(video_mae_config)
         else:
@@ -44,13 +44,12 @@ def get_transformer_encoder(model_name, T, modality=None):
                 )
             vivit = VivitModel(vivit_config, add_pooling_layer=False)
         else:
-            num_classes = 400
             use_mean_pooling = False
             vivit_config = VivitConfig(num_frames=T, num_labels=num_classes, use_mean_pooling=use_mean_pooling)
             vivit = VivitForVideoClassification(vivit_config)
         return vivit
 
-def get_cnn_encoder(model_name, residual_block):
+def get_cnn_encoder(model_name, residual_block, num_classes):
     if residual_block == "basic":
         res_block = BasicBlock
     elif residual_block == "bottleneck":
@@ -115,20 +114,22 @@ def get_cnn_encoder(model_name, residual_block):
             weights=None,
             progress=False
         )
+    elif model_name == "r3d_si_34":
+        video_encoder = make_resnet34k(num_classes=num_classes)
     else:
         raise NotImplementedError("Choose a correct model name!")
     return video_encoder
 
-def get_model(modality, model_name, T, residual_block):
+def get_model(modality, model_name, T, residual_block, num_classes=400):
     video_encoder, audio_encoder = None, None
     if modality == "audio":
-        audio_encoder = create_model("resnet50", in_chans=1)
+        audio_encoder = create_model("resnet50", in_chans=1, pretrained=False, num_classes=num_classes)
     elif modality == "rgb":
-        video_encoder = get_video_encoder(model_name, T, residual_block, modality)
+        video_encoder = get_video_encoder(model_name, T, residual_block, num_classes, modality)
     elif modality == "rgb_audio":
-        audio_encoder = create_model("resnet50", in_chans=1)
+        audio_encoder = create_model("resnet50", in_chans=1, pretrained=False, num_classes=num_classes)
         audio_encoder = nn.Sequential(*list(audio_encoder.children())[:-1])
-        video_encoder = get_video_encoder(model_name, T, residual_block, modality)
+        video_encoder = get_video_encoder(model_name, T, residual_block, num_classes, modality)
         if model_name.split("_")[0] in ["r2plus1", "mc3", "r3d"]:
             video_encoder = nn.Sequential(*list(video_encoder.children())[:-1])
     return video_encoder, audio_encoder

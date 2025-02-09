@@ -37,9 +37,10 @@ class KineticsDataset(Dataset):
 
     def __len__(self):
         if self.split == "train":
-            return 2**18
+            return 2**20
             return 4 * len(self.data)
         else:
+            # return 2**9
             return len(self.data)
         
     def _get_resize_transform(self, metadata):

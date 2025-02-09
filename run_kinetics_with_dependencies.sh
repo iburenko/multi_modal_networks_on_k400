@@ -2,8 +2,6 @@
 
 modality=$1
 model_name=$2
-lr=$3
-residual_block=$4
 
 get_batch_size () {
     if [ "$modality" == "audio" ]; then
@@ -44,8 +42,6 @@ ntasks_per_node="$gpus_per_node"
 
 echo modality "$modality"
 echo model name "$model_name"
-echo lr "$lr"
-echo residual block "$residual_block"
 echo train batch size "$train_bs"
 echo val batch size "$val_bs"
 echo num nodes "$num_nodes"
@@ -55,9 +51,8 @@ master_job_id=0
 sbatch_output=$(sbatch --nodes $num_nodes \
     --gres gpu:"$gpus_per_node" \
     --ntasks-per-node "$ntasks_per_node" \
-    --exclude c77 \
-    --job-name train_on_kinetics_model_"$model_name"_modality_"$modality"_lr_"$lr"_res_block_"$residual_block" \
-    run_kinetics_train_script.sh "$modality" "$model_name" "$lr" "$train_bs" "$val_bs" "$num_nodes" "$continue" "$master_job_id" "$residual_block")
+    --job-name train_on_kinetics_model_"$model_name"_modality_"$modality" \
+    run_kinetics_train_script.sh "$modality" "$model_name" "$train_bs" "$val_bs" "$num_nodes" "$continue" "$master_job_id")
 
 dependency_job_id=$(echo "$sbatch_output" | awk '{print $4}')
 master_job_id="$dependency_job_id"
@@ -77,10 +72,9 @@ do
     sbatch_output=$(sbatch --nodes $num_nodes \
         --gres gpu:"$gpus_per_node" \
         --ntasks-per-node "$ntasks_per_node" \
-        --exclude c77 \
-        --job-name train_on_kinetics_model_"$model_name"_modality_"$modality"_lr_"$lr"_res_block_"$residual_block" \
+        --job-name train_on_kinetics_model_"$model_name"_modality_"$modality" \
         --dependency=afterany:${dependency_job_id} \
-        run_kinetics_train_script.sh "$modality" "$model_name" "$lr" "$train_bs" "$val_bs" "$num_nodes" "$continue" "$master_job_id" "$residual_block")
+        run_kinetics_train_script.sh "$modality" "$model_name" "$train_bs" "$val_bs" "$num_nodes" "$continue" "$master_job_id")
     
     dependency_job_id=$(echo "$sbatch_output" | awk '{print $4}')
     

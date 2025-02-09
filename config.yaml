@@ -4,7 +4,7 @@ seed: 34
 
 model:
   model_name: ???
-  residual_block: ???
+  residual_block: basic
   T: 16
   num_classes: 400
 
@@ -12,7 +12,7 @@ optimization:
   lr: 0.1
   wd: 4.0e-5
   warmup: 0
-  epochs: 60
+  epochs: 75
   train_bs: ???
   val_bs: ???
   accumulate_batches: 2

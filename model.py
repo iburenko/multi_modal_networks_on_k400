@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 import lightning as L
-from pytorch_lightning.utilities import rank_zero_info
+from pytorch_lightning.utilities import rank_zero_only
 import torchmetrics as tm
 from einops import rearrange
 
@@ -12,6 +12,7 @@ from backbones import get_model
 class R3D(L.LightningModule):
     def __init__(self, conf):
         super().__init__()
+        
         assert conf is not None
         def set_val(d):
             for key, val in d.items():
@@ -20,10 +21,13 @@ class R3D(L.LightningModule):
                 else:
                     setattr(self, key, val)
         set_val(conf)
+
         self.save_hyperparameters(conf)
+
         models = get_model(self.modality, self.model_name, self.T, self.residual_block)
         self.video_model, self.audio_model = models
-        self.accuracy = tm.classification.Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.train_accuracy = tm.classification.Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.val_accuracy = tm.classification.Accuracy(task="multiclass", num_classes=self.num_classes)
         if self.modality == "rgb_audio":
             audio_feat_dim = 2048
             if self.model_name in ["vivit", "video_mae"]:
@@ -85,8 +89,11 @@ class R3D(L.LightningModule):
             video = self.reshape_input(video, "train")
         audio = audio.unsqueeze(1)
         logits = self(video, audio)
+        _, pred = logits.max(1)
         loss = F.cross_entropy(logits, labels)
-        self.log("train_loss", loss.item(), on_step=True, sync_dist=True)
+        self.train_accuracy(pred, labels)
+        self.log("train_loss", loss.item(), on_step=True, on_epoch=True)
+        self.log("train_acc", self.train_accuracy, on_step=True, on_epoch=True)
         return loss
     
     def validation_step(self, batch, batch_idx):
@@ -101,30 +108,29 @@ class R3D(L.LightningModule):
         logits = logits.mean(axis=1)
         _, pred = logits.max(1)
         loss = F.cross_entropy(logits, labels)
-        self.log("val_loss", loss.item(), on_step=True, sync_dist=True)
-        self.accuracy(pred, labels)
+        self.val_accuracy(pred, labels)
+        self.log("val_loss", loss.item(), on_step=True, on_epoch=True)
+        self.log("val_acc", self.val_accuracy, on_step=True, on_epoch=True)
 
-    @rank_zero_info
+    @rank_zero_only
     def on_train_epoch_start(self):
         print_current_time()
         print(f"Current training epoch {self.trainer.current_epoch} starts!", flush=True)
 
-    @rank_zero_info
+    @rank_zero_only
     def on_train_epoch_end(self):
         print_current_time()
         print(f"Current training epoch {self.trainer.current_epoch} finishes!", flush=True)
 
-    @rank_zero_info
+    @rank_zero_only
     def on_validation_epoch_start(self):
         print_current_time()
         print(f"Current validation epoch {self.trainer.current_epoch} starts!", flush=True)
     
+    @rank_zero_only
     def on_validation_epoch_end(self):
-        acc = self.accuracy.compute()
-        self.log("val_acc", acc, sync_dist=True)
         print_current_time()
-        print(f"Current validation epoch {self.trainer.current_epoch} finisehs!", flush=True)
-        print("="*80, flush=True)
+        print(f"Current validation epoch {self.trainer.current_epoch} finishes!", flush=True)
 
     def configure_optimizers(self):
         optimizer = torch.optim.SGD(self.parameters(), lr=self.lr, momentum=0.9, weight_decay=5e-4)
@@ -146,9 +152,15 @@ class R3D(L.LightningModule):
             #     milestones=[(i + 1) * 10 for i in range(self.epochs // 10)],
             #     verbose=True
             #     )
+            if self.modality == "audio":
+                first_milestone = 10
+                second_milestone = 30
+            else:
+                first_milestone = 15
+                second_milestone = 40
             scheduler = torch.optim.lr_scheduler.MultiStepLR(
                 optimizer, 
-                milestones=[15, 45],
+                milestones=[first_milestone, second_milestone],
                 verbose=True
                 )
         return [optimizer], [scheduler]

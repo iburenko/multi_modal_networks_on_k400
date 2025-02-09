@@ -10,13 +10,11 @@ export HF_HOME=/data/horse/ws/ilbu282f-mm_landscape/hf_home
 
 modality="$1"
 model_name="$2"
-lr="$3"
-train_bs="$4"
-val_bs="$5"
-num_nodes="$6"
-continue="$7"
-master_job_id="$8"
-residual_block="$9"
+train_bs="$3"
+val_bs="$4"
+num_nodes="$5"
+continue="$6"
+master_job_id="$7"
 
 module purge
 ml release/24.04 GCC/12.3.0 OpenMPI/4.1.5 PyTorch-bundle/2.1.2-CUDA-12.1.1
@@ -27,10 +25,8 @@ echo $(which python)
 srun python train_kinetics_with_warmup.py \
     --modality "$modality" \
     --model-name "$model_name" \
-    --lr "$lr" \
     --train-bs "$train_bs" \
     --val-bs "$val_bs" \
     --num-nodes "$num_nodes" \
     --continue-training "$continue" \
-    --master-job-id "$master_job_id" \
-    --residual-block "$residual_block"
+    --master-job-id "$master_job_id"

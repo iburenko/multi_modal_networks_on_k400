@@ -1,11 +1,10 @@
-from os import listdir as ls, environ, makedirs
+from os import environ, makedirs
 from argparse import ArgumentParser
 from pathlib import Path
 import random
 import yaml
 
 import torch
-from torch.utils.data import DataLoader
 import lightning as L
 from lightning.pytorch import seed_everything
 from lightning.pytorch.loggers import TensorBoardLogger
@@ -29,8 +28,9 @@ def main(args):
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
-    conf = put_args_into_yaml(args, conf, job_id)
     job_id = environ["SLURM_JOB_ID"]
+    job_id = 666
+    conf = put_args_into_yaml(args, conf, job_id)
     modality = args.modality
     model_name = args.model_name
     num_nodes = args.num_nodes
@@ -59,8 +59,8 @@ def main(args):
         dirpath=ckpt_path,
         save_top_k=1,
         mode="max",
-        monitor="val_acc",
-        filename="k400_" + model_name_with_res_block + "_{epoch:02d}_{val_acc:.2f}_job_id_" + str(job_id)
+        monitor="val_acc_epoch",
+        filename="k400_" + model_name_with_res_block + "_{epoch:02d}_{val_acc_epoch:.2f}_job_id_" + str(job_id)
         )
     if continue_training:
         last_ckpt = get_last_checkpoint(ckpt_path)
@@ -89,13 +89,11 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--modality", type=str)
     parser.add_argument("--model-name", type=str)
-    parser.add_argument("--lr", type=float)
     parser.add_argument("--train-bs", type=int)
     parser.add_argument("--val-bs", type=int)
     parser.add_argument("--num-nodes", type=int)
     parser.add_argument("--continue-training", type=int)
     parser.add_argument("--master-job-id", type=int)
-    parser.add_argument("--residual-block", type=str)
     args = parser.parse_args()
     print(args)
     main(args)
