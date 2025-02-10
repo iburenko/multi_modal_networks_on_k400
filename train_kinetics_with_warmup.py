@@ -23,7 +23,7 @@ torch.set_float32_matmul_precision("high")
 
 
 def main(args):
-    conf = yaml.safe_load(open("config.yaml"))
+    conf = yaml.safe_load(open("./multi_modal_networks_on_k400/config.yaml"))
     seed = conf["seed"]
     torch.manual_seed(seed)
     random.seed(seed)
@@ -89,6 +89,8 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--modality", type=str)
     parser.add_argument("--model-name", type=str)
+    parser.add_argument("--pretrained", action="store_true")
+    parser.add_argument("--scale-invariant", action="store_true")
     parser.add_argument("--train-bs", type=int)
     parser.add_argument("--val-bs", type=int)
     parser.add_argument("--num-nodes", type=int)

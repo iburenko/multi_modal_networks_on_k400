@@ -7,6 +7,7 @@ model:
   residual_block: basic
   T: 16
   num_classes: 400
+  pretrained: false
 
 optimization:
   lr: 0.1
@@ -23,3 +24,9 @@ training:
   job_id: ???
   train_num_workers: 14
   val_num_workers: 7
+
+scale_invariant_setup:
+  train_on_sphere: false
+  scale_invariant: ???
+  elr: 1.0e-4
+  linear_norm: 10

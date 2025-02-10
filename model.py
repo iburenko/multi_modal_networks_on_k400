@@ -24,10 +24,16 @@ class R3D(L.LightningModule):
 
         self.save_hyperparameters(conf)
 
-        models = get_model(self.modality, self.model_name, self.T, self.residual_block)
+        models = get_model(
+            self.modality,
+            self.model_name,
+            self.T,
+            self.residual_block,
+            pretrained=self.pretrained,
+            scale_invariant=self.scale_invariant
+        )
         self.video_model, self.audio_model = models
-        self.train_accuracy = tm.classification.Accuracy(task="multiclass", num_classes=self.num_classes)
-        self.val_accuracy = tm.classification.Accuracy(task="multiclass", num_classes=self.num_classes)
+        
         if self.modality == "rgb_audio":
             audio_feat_dim = 2048
             if self.model_name in ["vivit", "video_mae"]:
@@ -37,15 +43,41 @@ class R3D(L.LightningModule):
                     video_feat_dim = 2048
                 else:
                     video_feat_dim = 512
+            if self.scale_invariant:
+                norm_layer = torch.nn.BatchNorm1d(video_feat_dim, affine=False)
+            else:
+                norm_layer = torch.nn.Identity()
             self.fusion = torch.nn.Sequential(
-                torch.nn.Linear(audio_feat_dim + video_feat_dim, video_feat_dim),
+                torch.nn.Linear(audio_feat_dim + video_feat_dim, video_feat_dim, bias=False),
+                norm_layer,
                 torch.nn.ReLU(inplace=True),
-                torch.nn.Linear(video_feat_dim, video_feat_dim),
+                torch.nn.Linear(video_feat_dim, video_feat_dim, bias=False),
+                norm_layer,
                 torch.nn.ReLU(inplace=True),
-                torch.nn.Linear(video_feat_dim, self.num_classes)
+                torch.nn.Linear(video_feat_dim, self.num_classes, bias=False)
             )
         else:
             self.fusion = torch.nn.Identity()
+        
+        if self.scale_invariant:
+            if self.modality == "audio":
+                W = self.audio_model.fc.weight.data
+                self.audio_model.fc.weight.data.copy_(self.linear_norm * W / W.norm())
+                for p in self.audio_model.fc.parameters():
+                    p.requires_grad = False
+            elif self.modality == "rgb":
+                W = self.video_model.linear.weight.data
+                self.video_model.linear.weight.data.copy_(self.linear_norm * W / W.norm())
+                for p in self.video_model.linear.parameters():
+                    p.requires_grad = False
+            else:
+                W = self.fusion[-1].weight.data
+                self.fusion[-1].weight.data.copy_(self.linear_norm * W / W.norm())
+                for p in self.fusion[-1:].parameters():
+                    p.requires_grad = False
+
+        self.train_accuracy = tm.classification.Accuracy(task="multiclass", num_classes=self.num_classes)
+        self.val_accuracy = tm.classification.Accuracy(task="multiclass", num_classes=self.num_classes)
 
     def reshape_input(self, video, split):
         if split == "train":
