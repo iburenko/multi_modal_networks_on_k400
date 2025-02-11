@@ -35,7 +35,10 @@ class R3D(L.LightningModule):
         self.video_model, self.audio_model = models
         
         if self.modality == "rgb_audio":
-            audio_feat_dim = 2048
+            if "34" in self.model_name:
+                audio_feat_dim = 512
+            elif "50" in self.model_name:
+                audio_feat_dim = 2048
             if self.model_name in ["vivit", "video_mae"]:
                 video_feat_dim = 768
             elif self.model_name.split("_")[0] in ["r2plus1", "mc3", "r3d"]:
@@ -66,9 +69,9 @@ class R3D(L.LightningModule):
                 for p in self.audio_model.fc.parameters():
                     p.requires_grad = False
             elif self.modality == "rgb":
-                W = self.video_model.linear.weight.data
-                self.video_model.linear.weight.data.copy_(self.linear_norm * W / W.norm())
-                for p in self.video_model.linear.parameters():
+                W = self.video_model.fc.weight.data
+                self.video_model.fc.weight.data.copy_(self.linear_norm * W / W.norm())
+                for p in self.video_model.fc.parameters():
                     p.requires_grad = False
             else:
                 W = self.fusion[-1].weight.data

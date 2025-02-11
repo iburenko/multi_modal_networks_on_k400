@@ -18,15 +18,11 @@ from torchvision.models.video import r3d_18, r2plus1d_18, mc3_18
 
 from resnet_si import make_resnet34k, make_resnet34k_3d
 
-def get_video_encoder(model_name, T, residual_block, num_classes, modality, pretrained, scale_invariant):
+def get_video_encoder(model_name, T, residual_block, num_classes, modality):
     if model_name in ["video_mae", "vivit"]:
         return get_transformer_encoder(model_name, T, num_classes, modality)
     elif model_name.split("_")[0] in ["r2plus1", "mc3", "r3d"]:
         cnn_encoder = get_cnn_encoder(model_name, residual_block, num_classes)
-        if pretrained:
-            assert "34" in model_name
-            rn18_pretrained = r3d_18(weights=True)
-            cnn_encoder = copy_weights(cnn_encoder, rn18_pretrained, scale_invariant)
         return cnn_encoder
 
 def get_transformer_encoder(model_name, T, num_classes, modality):
@@ -128,6 +124,31 @@ def get_cnn_encoder(model_name, residual_block, num_classes):
         raise NotImplementedError("Choose a correct model name!")
     return video_encoder
 
+def filter_audio_state(state_dict, scale_invariant=False):
+    filtered_state_dict = dict()
+    for key, val in state_dict.items():
+        if scale_invariant and "bn" in key:
+            continue
+        if "downsample" in key:
+            splitted_key = key.split(".")
+            old_ind = int(splitted_key[4])
+            if scale_invariant:
+                if "running" in key:
+                    continue
+                new_ind = old_ind % 2
+            else:
+                new_ind = old_ind - 1
+            splitted_key[4] = str(new_ind)
+            new_key = ".".join(splitted_key[1:])
+            filtered_state_dict[new_key] = val
+            continue
+        if not key.startswith("resnet"):
+            continue
+        else:
+            new_key = ".".join(key.split(".")[1:])
+            filtered_state_dict[new_key] = val
+    return filtered_state_dict
+
 def copy_weights(rn34, rn18, scale_invariant):
     ## Initialise the weights of Resnet34 3D CNN using the layers
     #+ of the Resnet18 3D Cnn.
@@ -160,7 +181,7 @@ def copy_weights(rn34, rn18, scale_invariant):
         rn18_layer = getattr(rn18, layer_name)
         if layer_name in ["layer2", "layer3", "layer4"]:
             source_downsample_conv = rn18_layer[0].downsample[0]
-            target_downsample_conv = rn34_layer[0].shortcut[1]
+            target_downsample_conv = rn34_layer[0].downsample[1]
             target_downsample_conv.load_state_dict(source_downsample_conv.state_dict())
         for i in range(2):
             rn34_block = rn34_layer[i]
@@ -189,6 +210,47 @@ def copy_weights(rn34, rn18, scale_invariant):
             update_si_layer(layer_name, rn34, rn18)
     return rn34
 
+def load_pretrained_video_weights(video_encoder, scale_invariant):
+    # Works only for ResNet-34 models!
+    if video_encoder is None:
+        return None
+    rn18_pretrained = r3d_18(weights=True)
+    video_encoder = copy_weights(video_encoder, rn18_pretrained, scale_invariant)
+    return video_encoder
+
+def load_pretrained_audio_weights(audio_encoder, scale_invariant):
+    if audio_encoder is None:
+        return None
+    state_dict = torch.load("/home/hpc/b105dc/b105dc10/si_cnns/audioset_tagging_cnn/checkpoints/resnet38.pth")["model"]
+    filtered_state_dict = filter_audio_state(state_dict, scale_invariant=scale_invariant)
+    audio_encoder.load_state_dict(filtered_state_dict, strict=False)
+    return audio_encoder
+
+def create_video_encoder(modality, model_name, T, residual_block, num_classes):
+    if modality == "audio":
+        return None
+    video_encoder = get_video_encoder(model_name, T, residual_block, num_classes, modality)
+    return video_encoder
+
+def create_audio_encoder(modality, num_classes, scale_invariant):
+    if modality == "rgb":
+        return None
+    if scale_invariant:
+        audio_encoder = make_resnet34k(num_classes=num_classes, in_chans=1)
+    else:
+        audio_encoder = create_model("resnet34", in_chans=1, pretrained=False, num_classes=num_classes)
+    if modality == "audio" and not scale_invariant:
+        audio_encoder.fc = nn.Linear(512, num_classes, bias=False)
+    return audio_encoder
+
+def delete_classification_head(model):
+    return nn.Sequential(*list(model.children())[:-1])
+
+def modify_model_name(model_name):
+    model_name_split = model_name.split("_")
+    model_name_split.insert(1, "si")
+    return "_".join(model_name_split)
+
 def get_model(
         modality,
         model_name,
@@ -198,26 +260,15 @@ def get_model(
         pretrained=False,
         scale_invariant=False,
     ):
-    video_encoder, audio_encoder = None, None
     if scale_invariant:
-        model_name_split = model_name.split("_")
-        model_name_split.insert(1, "si")
-        model_name = "_".join(model_name_split)
-    if modality == "audio":
-        if scale_invariant:
-            audio_encoder = make_resnet34k(num_classes=num_classes)
-        else:
-            audio_encoder = create_model("resnet34", in_chans=1, pretrained=False, num_classes=num_classes)
-            audio_encoder.fc = nn.Linear(2048, num_classes, bias=False)
-    elif modality == "rgb":
-        video_encoder = get_video_encoder(model_name, T, residual_block, num_classes, modality, pretrained, scale_invariant)
-    elif modality == "rgb_audio":
-        if scale_invariant:
-            audio_encoder = make_resnet34k(num_classes=num_classes)
-        else:
-            audio_encoder = create_model("resnet34", in_chans=1, pretrained=False, num_classes=num_classes)
-        audio_encoder = nn.Sequential(*list(audio_encoder.children())[:-1])
-        video_encoder = get_video_encoder(model_name, T, residual_block, num_classes, modality, pretrained, scale_invariant)
+        model_name = modify_model_name(model_name)
+    audio_encoder = create_audio_encoder(modality, num_classes, scale_invariant)
+    video_encoder = create_video_encoder(modality, model_name, T, residual_block, num_classes)
+    if pretrained:
+        video_encoder = load_pretrained_video_weights(video_encoder, scale_invariant)
+        audio_encoder = load_pretrained_audio_weights(audio_encoder, scale_invariant)
+    if modality == "rgb_audio":
+        audio_encoder = delete_classification_head(audio_encoder)
         if model_name.split("_")[0] in ["r2plus1", "mc3", "r3d"]:
-            video_encoder = nn.Sequential(*list(video_encoder.children())[:-1])
+            video_encoder = delete_classification_head(video_encoder)
     return video_encoder, audio_encoder
