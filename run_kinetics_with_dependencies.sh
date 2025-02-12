@@ -2,6 +2,8 @@
 
 modality=$1
 model_name=$2
+pretrained=$3
+scale_invariant=$3
 
 get_batch_size () {
     if [ "$modality" == "audio" ]; then
@@ -52,7 +54,16 @@ sbatch_output=$(sbatch --nodes $num_nodes \
     --gres gpu:"$gpus_per_node" \
     --ntasks-per-node "$ntasks_per_node" \
     --job-name train_on_kinetics_model_"$model_name"_modality_"$modality" \
-    run_kinetics_train_script.sh "$modality" "$model_name" "$train_bs" "$val_bs" "$num_nodes" "$continue" "$master_job_id")
+    run_kinetics_train_script.sh \
+        "$modality" \
+        "$model_name" \
+        "$train_bs" \
+        "$val_bs" \
+        "$num_nodes" \
+        "$continue" \
+        "$master_job_id" \
+        "$pretrained" \
+        "$scale_invariant")
 
 dependency_job_id=$(echo "$sbatch_output" | awk '{print $4}')
 master_job_id="$dependency_job_id"
@@ -74,7 +85,16 @@ do
         --ntasks-per-node "$ntasks_per_node" \
         --job-name train_on_kinetics_model_"$model_name"_modality_"$modality" \
         --dependency=afterany:${dependency_job_id} \
-        run_kinetics_train_script.sh "$modality" "$model_name" "$train_bs" "$val_bs" "$num_nodes" "$continue" "$master_job_id")
+        run_kinetics_train_script.sh \
+            "$modality" \
+            "$model_name" \
+            "$train_bs" \
+            "$val_bs" \
+            "$num_nodes" \
+            "$continue" \
+            "$master_job_id" \
+            "$pretrained" \
+            "$scale_invariant")
     
     dependency_job_id=$(echo "$sbatch_output" | awk '{print $4}')
     

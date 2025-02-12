@@ -18,18 +18,18 @@ from io_utils import (
     print_current_time,
     get_last_checkpoint, get_experiment_folder_name
 )
+from parse_utils import str2bool
 
 torch.set_float32_matmul_precision("high")
 
 
 def main(args):
-    conf = yaml.safe_load(open("./multi_modal_networks_on_k400/config.yaml"))
+    conf = yaml.safe_load(open("./config.yaml"))
     seed = conf["seed"]
     torch.manual_seed(seed)
     random.seed(seed)
     np.random.seed(seed)
     job_id = environ["SLURM_JOB_ID"]
-    job_id = 666
     conf = put_args_into_yaml(args, conf, job_id)
     modality = args.modality
     model_name = args.model_name
@@ -89,13 +89,13 @@ if __name__ == "__main__":
     parser = ArgumentParser()
     parser.add_argument("--modality", type=str)
     parser.add_argument("--model-name", type=str)
-    parser.add_argument("--pretrained", action="store_true")
-    parser.add_argument("--scale-invariant", action="store_true")
     parser.add_argument("--train-bs", type=int)
     parser.add_argument("--val-bs", type=int)
     parser.add_argument("--num-nodes", type=int)
     parser.add_argument("--continue-training", type=int)
     parser.add_argument("--master-job-id", type=int)
+    parser.add_argument("--pretrained", type=str2bool)
+    parser.add_argument("--scale-invariant", type=str2bool)
     args = parser.parse_args()
     print(args)
     main(args)

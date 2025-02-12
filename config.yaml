@@ -7,7 +7,7 @@ model:
   residual_block: basic
   T: 16
   num_classes: 400
-  pretrained: false
+  pretrained: ???
 
 optimization:
   lr: 0.1
