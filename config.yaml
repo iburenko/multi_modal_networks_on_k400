@@ -4,10 +4,10 @@ seed: 34
 
 model:
   model_name: ???
-  residual_block: basic
+  residual_block: bottleneck
   T: 16
   num_classes: 400
-  pretrained: ???
+  pretrained: false
 
 optimization:
   lr: 0.1
@@ -16,7 +16,7 @@ optimization:
   epochs: 75
   train_bs: ???
   val_bs: ???
-  accumulate_batches: 2
+  accumulate_batches: 1
 
 training:
   num_nodes: ???
@@ -27,6 +27,12 @@ training:
 
 scale_invariant_setup:
   train_on_sphere: false
-  scale_invariant: ???
+  scale_invariant: false
   elr: 1.0e-4
   linear_norm: 10
+
+data_preprocessing:
+  crop_size: 224
+  min_resize_size: 256
+  max_resize_size: 320
+  snippets_per_val_sample: 10

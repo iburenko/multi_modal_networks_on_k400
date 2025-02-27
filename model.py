@@ -21,6 +21,9 @@ class R3D(L.LightningModule):
                 else:
                     setattr(self, key, val)
         set_val(conf)
+        if self.pretrained:
+            self.lr = self.lr / 10
+            conf["optimization"]["lr"] = self.lr
 
         self.save_hyperparameters(conf)
 
@@ -188,8 +191,8 @@ class R3D(L.LightningModule):
             #     verbose=True
             #     )
             if self.modality == "audio":
-                first_milestone = 10
-                second_milestone = 30
+                first_milestone = 8
+                second_milestone = 35
             else:
                 first_milestone = 15
                 second_milestone = 40

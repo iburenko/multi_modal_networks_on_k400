@@ -46,13 +46,14 @@ def main(args):
     kinetics_datamodule = KineticsDataModule(conf)
     
     save_dir = Path("/data/cat/ws/ilbu282f-kinetics_dataset/experiments/")
+    # save_dir = Path("/data/horse/ws/ilbu282f-mm_landscape/experiments")
     model_name_with_res_block = f"{model_name}_{residual_block}"
     tb_log_dir = save_dir.joinpath("tb_logs", model_name_with_res_block, modality)
     ckpt_modality_model_path = save_dir.joinpath("checkpoints", model_name_with_res_block, modality)
     makedirs(ckpt_modality_model_path, exist_ok=True)
     experiment_folder = get_experiment_folder_name(job_id, master_job_id, ckpt_modality_model_path)
     ckpt_path = ckpt_modality_model_path.joinpath(experiment_folder)
-    
+
     logger = TensorBoardLogger(tb_log_dir, name=experiment_folder)
     lr_monitor = LearningRateMonitor(logging_interval='epoch')
     checkpoint_callback = ModelCheckpoint(
@@ -94,8 +95,7 @@ if __name__ == "__main__":
     parser.add_argument("--num-nodes", type=int)
     parser.add_argument("--continue-training", type=int)
     parser.add_argument("--master-job-id", type=int)
-    parser.add_argument("--pretrained", type=str2bool)
-    parser.add_argument("--scale-invariant", type=str2bool)
+    parser.add_argument("--accumulate-batches", type=int)
     args = parser.parse_args()
     print(args)
     main(args)

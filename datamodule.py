@@ -14,8 +14,8 @@ class KineticsDataModule(pl.LightningDataModule):
         self.conf = conf
 
     def setup(self, stage: Optional[str] = None) -> None:
-        self.train_dataset = KineticsDataset("train", self.train_bs)
-        self.val_dataset = KineticsDataset("val", self.val_bs)
+        self.train_dataset = KineticsDataset("train", self.modality)
+        self.val_dataset = KineticsDataset("val", self.modality)
 
     def train_dataloader(self) -> DataLoader:
         return  DataLoader(

@@ -15,8 +15,7 @@ val_bs="$4"
 num_nodes="$5"
 continue="$6"
 master_job_id="$7"
-pretrained="$8"
-scale_invariant="$9"
+accumulate_batches="$8"
 
 module purge
 ml release/24.04 GCC/12.3.0 OpenMPI/4.1.5 PyTorch-bundle/2.1.2-CUDA-12.1.1
@@ -32,5 +31,4 @@ srun python train_kinetics_with_warmup.py \
     --num-nodes "$num_nodes" \
     --continue-training "$continue" \
     --master-job-id "$master_job_id" \
-    --pretrained "$pretrained" \
-    --scale_invariant "$scale_invariant"
+    --accumulate-batches "$accumulate_batches"

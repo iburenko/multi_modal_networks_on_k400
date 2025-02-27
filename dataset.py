@@ -5,13 +5,13 @@ from pathlib import Path
 import torch
 import torchvision as tv
 import torchvision.transforms.v2 as transforms_v2
-from torch.utils.data import Dataset
+from torch.utils.data import Dataset, get_worker_info
 import numpy as np
 import librosa
 
 class KineticsDataset(Dataset):
     def __init__(self, split, modality, T=16, crop_size=224):
-        json_home = Path("/data/horse/ws/ilbu282f-mm_landscape/kinetics-dataset/k400/jsons")
+        json_home = Path("/data/cat/ws/ilbu282f-kinetics_cat/kinetics-dataset/k400/jsons")
         self.split = split
         self.modality = modality
         self.T = T
@@ -106,12 +106,13 @@ class KineticsDataset(Dataset):
         video_fps = metadata["video_fps"]
         audio_fps = metadata["audio_fps"]
         if self.split == "train":
+            audio_features = torch.zeros(40, 100)
+            video_snippet = torch.zeros(self.T, 3, self.crop_size, self.crop_size)
             start_ind = random.randint(0, video_len - self.T)
-            audio_snippet = self._align_audio_with_snippet(audio, start_ind, video_fps, audio_fps)
-            audio_features = self.generate_log_mel_spectrogram(audio_snippet, audio_fps)
-            if self.modality == "audio":
-                video_snippet = torch.zeros(self.T, 3, self.crop_size, self.crop_size)
-            else:
+            if "audio" in self.modality: # Do not process audio if we do not need it.
+                audio_snippet = self._align_audio_with_snippet(audio, start_ind, video_fps, audio_fps)
+                audio_features = self.generate_log_mel_spectrogram(audio_snippet, audio_fps)
+            if "rgb" in self.modality: # Do not process video if we do not need it.
                 video_snippet = video[start_ind:start_ind + self.T]
                 video_snippet = self.apply_transforms(video_snippet, metadata)
         else:
@@ -119,12 +120,11 @@ class KineticsDataset(Dataset):
             video_snippet = torch.zeros(self.val_num_sampler_per_video, self.T, 3, self.crop_size, self.crop_size)
             audio_features = torch.zeros(self.val_num_sampler_per_video, 40, 100)
             for i, start_ind in enumerate(start_inds):
-                audio_sub_snippet = self._align_audio_with_snippet(audio, start_ind, video_fps, audio_fps)
-                audio_sub_snippet_feats = self.generate_log_mel_spectrogram(audio_sub_snippet, audio_fps)
-                audio_features[i] = audio_sub_snippet_feats
-                if self.modality == "audio":
-                    continue
-                else:
+                if "audio" in self.modality: # Do not process audio if we do not need it.
+                    audio_sub_snippet = self._align_audio_with_snippet(audio, start_ind, video_fps, audio_fps)
+                    audio_sub_snippet_feats = self.generate_log_mel_spectrogram(audio_sub_snippet, audio_fps)
+                    audio_features[i] = audio_sub_snippet_feats
+                if "rgb" in self.modality: # Do not process video if we do not need it.
                     video_sub_snippet = video[start_ind:start_ind + self.T]
                     video_snippet[i] = self.apply_transforms(video_sub_snippet, metadata)
         return video_snippet, audio_features, self.label_dict[label]

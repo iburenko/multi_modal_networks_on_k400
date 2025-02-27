@@ -221,7 +221,7 @@ def load_pretrained_video_weights(video_encoder, scale_invariant):
 def load_pretrained_audio_weights(audio_encoder, scale_invariant):
     if audio_encoder is None:
         return None
-    state_dict = torch.load("/home/hpc/b105dc/b105dc10/si_cnns/audioset_tagging_cnn/checkpoints/resnet38.pth")["model"]
+    state_dict = torch.load("/data/horse/ws/ilbu282f-mm_landscape/pann_checkpoint/resnet38.pth")["model"]
     filtered_state_dict = filter_audio_state(state_dict, scale_invariant=scale_invariant)
     audio_encoder.load_state_dict(filtered_state_dict, strict=False)
     return audio_encoder
@@ -232,15 +232,23 @@ def create_video_encoder(modality, model_name, T, residual_block, num_classes):
     video_encoder = get_video_encoder(model_name, T, residual_block, num_classes, modality)
     return video_encoder
 
-def create_audio_encoder(modality, num_classes, scale_invariant):
+def create_audio_encoder(modality, num_classes, scale_invariant, model_name="resnet34"):
     if modality == "rgb":
         return None
     if scale_invariant:
         audio_encoder = make_resnet34k(num_classes=num_classes, in_chans=1)
     else:
-        audio_encoder = create_model("resnet34", in_chans=1, pretrained=False, num_classes=num_classes)
+        if "34" in model_name:
+            audio_encoder = create_model("resnet34", in_chans=1, pretrained=False, num_classes=num_classes)
+        else:
+            audio_encoder = create_model("resnet50", in_chans=1, pretrained=False, num_classes=num_classes)
     if modality == "audio" and not scale_invariant:
-        audio_encoder.fc = nn.Linear(512, num_classes, bias=False)
+        if "34" in model_name:
+            audio_encoder.fc = nn.Linear(512, num_classes, bias=False)
+        else:
+            ## This code is here for the legacy reasons.
+            #+ The first audio model was trained with 1000 classes and bias.
+            audio_encoder.fc = nn.Linear(2048, 1000, bias=True)
     return audio_encoder
 
 def delete_classification_head(model):
@@ -262,7 +270,7 @@ def get_model(
     ):
     if scale_invariant:
         model_name = modify_model_name(model_name)
-    audio_encoder = create_audio_encoder(modality, num_classes, scale_invariant)
+    audio_encoder = create_audio_encoder(modality, num_classes, scale_invariant, model_name)
     video_encoder = create_video_encoder(modality, model_name, T, residual_block, num_classes)
     if pretrained:
         video_encoder = load_pretrained_video_weights(video_encoder, scale_invariant)
